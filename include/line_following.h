@@ -19,6 +19,12 @@ void turnLeft();
 void turnRight();
 void correctLeft();
 void correctRight();
+void staticLeft();
+void staticRight();
+
+float getAngle();
+
+float startAngle = 0.0f;
 
 
 #define BASE_SPEED 180  // Базовая скорость 180
@@ -87,6 +93,21 @@ void correctRight() {
   setLeftMotor(BASE_SPEED);
   setRightMotor(BASE_SPEED - TURN_FACTOR/2);
 }
+
+void staticLeft() {
+  // TODO: реализовать поворот на месте с использованием угла с гироскопа
+  // setLeftMotor(-BASE_SPEED); // ?
+  setLeftMotor(0);
+  setRightMotor(BASE_SPEED);
+}
+
+void staticRight() {
+  // TODO: реализовать поворот на месте с использованием угла с гироскопа
+  setLeftMotor(BASE_SPEED);
+  setRightMotor(0);
+  // setRightMotor(-BASE_SPEED); // ?
+}
+
 
 void stopMotors() {
   setLeftMotor(0);

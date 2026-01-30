@@ -23,6 +23,23 @@ Ultrasonic sonar(TRIG_PIN, ECHO_PIN);
 MPU6050 mpu;
 
 uint8_t fifoBuffer[45];         // буфер
+uint32_t yprTimer = 0;
+float ypr[3];
+
+float getAngleZ() {
+  // данные от датчика прилетает раз в 10 мс
+  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer) && millis() - yprTimer >= 11) {
+    Quaternion q;
+    VectorFloat gravity;
+    
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+    yprTimer = millis();
+  }
+  return ypr[0];
+}
 
 void setup() {
   Serial.begin(115200);
@@ -62,9 +79,10 @@ void loop() {
   
     // moveStraight();
     // turnLeft();
-    sharpLeft();
+  
+    staticLeft();
     // setLeftMotor(BASE_SPEED);
-    delay(1000);
+    delay(500);
     stopMotors();
     delay(5000);
 
