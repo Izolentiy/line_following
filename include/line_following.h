@@ -13,6 +13,7 @@ void setLeftMotor(int speed);
 void setRightMotor(int speed);
 
 void moveStraight();
+void slightStraight();
 void sharpLeft();
 void sharpRight();
 void turnLeft();
@@ -22,14 +23,16 @@ void correctRight();
 void staticLeft();
 void staticRight();
 
-float getAngle();
+float getAngleZ();
+
+
 
 float startAngle = 0.0f;
 
 
-#define BASE_SPEED 180  // Базовая скорость 180
-#define MIN_SPEED 120   // Минимальная скорость 80
-#define TURN_FACTOR 50  // Сила поворота 90
+#define BASE_SPEED 120  // Базовая скорость
+#define MIN_SPEED 100   // Минимальная скорость 
+#define TURN_FACTOR 60  // Сила поворота 
 
 void setupMotors() {
   pinMode(L_MOTOR_IN1, OUTPUT);
@@ -64,14 +67,19 @@ void moveStraight() {
   setRightMotor(BASE_SPEED);
 }
 
-void sharpLeft() {
+void slightStraight(){
   setLeftMotor(MIN_SPEED);
-  setRightMotor(BASE_SPEED + TURN_FACTOR);
+  setRightMotor(MIN_SPEED);
+}
+
+void sharpLeft() {
+  setLeftMotor(-BASE_SPEED);
+  setRightMotor(BASE_SPEED);
 }
 
 void sharpRight() {
-  setLeftMotor(BASE_SPEED + TURN_FACTOR);
-  setRightMotor(MIN_SPEED);
+  setLeftMotor(BASE_SPEED);
+  setRightMotor(-BASE_SPEED);
 }
 
 void turnLeft() {
@@ -94,18 +102,28 @@ void correctRight() {
   setRightMotor(BASE_SPEED - TURN_FACTOR/2);
 }
 
-void staticLeft() {
-  // TODO: реализовать поворот на месте с использованием угла с гироскопа
-  // setLeftMotor(-BASE_SPEED); // ?
-  setLeftMotor(0);
+void staticLeft() {//накапливает разницу в изначальном и нынешнем угле робота чтобы получить 90 градусный поворот
+  float AngleDiffer=0,prevAngle=getAngleZ(),nowAngle;
+  setLeftMotor(-BASE_SPEED);
   setRightMotor(BASE_SPEED);
+  while (AngleDiffer<3.14/2){
+    nowAngle=getAngleZ();
+    AngleDiffer+=abs(abs(prevAngle)-abs(nowAngle));
+    prevAngle=nowAngle;
+  }
+  stopMotors();
 }
 
-void staticRight() {
-  // TODO: реализовать поворот на месте с использованием угла с гироскопа
+void staticRight() {//работает по такому же приницпу как и staticRight но в правую сторону сторону
+  float AngleDiffer=0,prevAngle=getAngleZ(),nowAngle;
   setLeftMotor(BASE_SPEED);
-  setRightMotor(0);
-  // setRightMotor(-BASE_SPEED); // ?
+  setRightMotor(-BASE_SPEED);
+  while (AngleDiffer<3.14/2){
+    nowAngle=getAngleZ();
+    AngleDiffer+=abs(abs(prevAngle)-abs(nowAngle));
+    prevAngle=nowAngle;
+  }
+  stopMotors();
 }
 
 
@@ -113,3 +131,4 @@ void stopMotors() {
   setLeftMotor(0);
   setRightMotor(0);
 }
+
