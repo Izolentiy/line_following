@@ -1,17 +1,13 @@
 #pragma once
-#include <Arduino.h>
+#include "common.h"
 
-#define L_MOTOR_IN1 5  // D5 (ШИМ)
-#define L_MOTOR_IN2 7  // D7
-#define R_MOTOR_IN1 6  // D6 (ШИМ)
-#define R_MOTOR_IN2 8  // D8
 
-void setupMotors();
-void stopMotors();
+#define MAX_SPEED   255
+#define BASE_SPEED  150   // Базовая скорость
+#define MIN_SPEED   100   // Минимальная скорость 
+#define TURN_FACTOR 60    // Сила поворота 
 
-void setLeftMotor(int speed);
-void setRightMotor(int speed);
-
+void setupLineSensors();
 void moveStraight();
 void slightStraight();
 void sharpLeft();
@@ -22,46 +18,16 @@ void correctLeft();
 void correctRight();
 void staticLeft();
 void staticRight();
-
-float getAngleZ();
-
+void lineFollowing();
 
 
-float startAngle = 0.0f;
-
-
-#define BASE_SPEED 120  // Базовая скорость
-#define MIN_SPEED 100   // Минимальная скорость 
-#define TURN_FACTOR 60  // Сила поворота 
-
-void setupMotors() {
-  pinMode(L_MOTOR_IN1, OUTPUT);
-  pinMode(L_MOTOR_IN2, OUTPUT);
-  pinMode(R_MOTOR_IN1, OUTPUT);
-  pinMode(R_MOTOR_IN2, OUTPUT);
+void setupLineSensors() {
+  pinMode(S_LEFT_MOST, INPUT);
+  pinMode(S_LEFT, INPUT);
+  pinMode(S_RIGHT, INPUT);
+  pinMode(S_RIGHT_MOST, INPUT);
 }
 
-void setLeftMotor(int speed) {
-  if (speed >= 0) {
-    analogWrite(L_MOTOR_IN1, speed);
-    digitalWrite(L_MOTOR_IN2, LOW);
-  } else {
-    analogWrite(L_MOTOR_IN1, speed);
-    digitalWrite(L_MOTOR_IN2, HIGH);
-  }
-}
-
-void setRightMotor(int speed) {
-  if (speed >= 0) {
-    analogWrite(R_MOTOR_IN1, speed);
-    digitalWrite(R_MOTOR_IN2, LOW);
-  } else {
-    analogWrite(R_MOTOR_IN1, speed);
-    digitalWrite(R_MOTOR_IN2, HIGH);
-  }
-}
-
-// Команды движения
 void moveStraight() {
   setLeftMotor(BASE_SPEED);
   setRightMotor(BASE_SPEED);
@@ -126,9 +92,63 @@ void staticRight() {//работает по такому же приницпу �
   stopMotors();
 }
 
-
 void stopMotors() {
   setLeftMotor(0);
   setRightMotor(0);
+}
+
+void lineFollowing() {
+  // // Чтение состояния датчиков (LOW = линия обнаружена)
+  bool s1 = !(digitalRead(S_LEFT_MOST) == LOW);
+  bool s2 = !(digitalRead(S_LEFT) == LOW);
+  bool s3 = !(digitalRead(S_RIGHT) == LOW);
+  bool s4 = !(digitalRead(S_RIGHT_MOST) == LOW);
+
+  // Определение положения линии
+  if (s1 && s2 && s3 && s4) {
+    // Перекресток - продолжаем движение
+    moveStraight();
+  } 
+  else if (s1 && s2) {
+    // Линия справа - поворот направо
+    turnLeft();
+  } 
+  else if (s3 && s4) {
+    // Линия слева - поворот налево
+    turnRight();
+  } 
+  else if (s4) {
+    // Крайняя линия справа - резкий поворот направо
+    sharpRight();
+  } 
+  else if (s1) {
+    // Крайняя линия слева - резкий поворот налево
+    sharpLeft();
+  } 
+  else if (s2 && s3) {
+    // Центр линии - движение прямо
+    moveStraight();
+  } 
+  else if (s3) {
+    // Линия немного справа - небольшая коррекция направо
+    correctRight();
+  } 
+  else if (s2) {
+    // Линия немного слева - небольшая коррекция налево
+    correctLeft();
+  } 
+  else {
+    unsigned long lost_line = millis();
+    while((millis()-lost_line<1000) && (s1 && s2 && s3 && s4)){
+      bool s1 = !(digitalRead(S_LEFT_MOST) == LOW);
+      bool s2 = !(digitalRead(S_LEFT) == LOW);
+      bool s3 = !(digitalRead(S_RIGHT) == LOW);
+      bool s4 = !(digitalRead(S_RIGHT_MOST) == LOW);
+    }
+    if (millis()-lost_line>=900){
+      stopMotors();
+    }
+    // Линия потеряна - остановка
+  } 
 }
 
