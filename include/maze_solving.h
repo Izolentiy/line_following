@@ -2,7 +2,6 @@
 #include "common.h"
 #include "line_following.h"
 
-
 bool pulseflag = true, starterflag = true, sideflag = true;
 uint32_t start, end;
 

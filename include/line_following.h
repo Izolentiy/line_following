@@ -1,12 +1,6 @@
 #pragma once
 #include "common.h"
 
-
-#define MAX_SPEED   255
-#define BASE_SPEED  150   // Базовая скорость
-#define MIN_SPEED   100   // Минимальная скорость 
-#define TURN_FACTOR 60    // Сила поворота 
-
 void setupLineSensors();
 void moveStraight();
 void slightStraight();
@@ -92,11 +86,6 @@ void staticRight() {//работает по такому же приницпу �
   stopMotors();
 }
 
-void stopMotors() {
-  setLeftMotor(0);
-  setRightMotor(0);
-}
-
 void lineFollowing() {
   // // Чтение состояния датчиков (LOW = линия обнаружена)
   bool s1 = !(digitalRead(S_LEFT_MOST) == LOW);
@@ -140,10 +129,10 @@ void lineFollowing() {
   else {
     unsigned long lost_line = millis();
     while((millis()-lost_line<1000) && (s1 && s2 && s3 && s4)){
-      bool s1 = !(digitalRead(S_LEFT_MOST) == LOW);
-      bool s2 = !(digitalRead(S_LEFT) == LOW);
-      bool s3 = !(digitalRead(S_RIGHT) == LOW);
-      bool s4 = !(digitalRead(S_RIGHT_MOST) == LOW);
+      // bool s1 = !(digitalRead(S_LEFT_MOST) == LOW);
+      // bool s2 = !(digitalRead(S_LEFT) == LOW);
+      // bool s3 = !(digitalRead(S_RIGHT) == LOW);
+      // bool s4 = !(digitalRead(S_RIGHT_MOST) == LOW);
     }
     if (millis()-lost_line>=900){
       stopMotors();

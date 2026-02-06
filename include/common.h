@@ -19,7 +19,27 @@
 
 #define SERVO_DELAY_MS 200
 #define SERVO_DELAY_MS_PER_DEGREE 2
-#define MAX_SPEED   255
+
+#define MAX_SPEED       255
+#define BASE_SPEED      120
+#define MIN_SPEED       100
+#define TURN_FACTOR     60 
+#define TURN_STRENGTH   1600
+#define TURN_SPEED      200
+
+#define LEFT 180
+#define AHEAD 90
+#define RIGHT 0
+
+#define PI_HALF 1.570796f
+
+#define ROBOT_DEBUG
+#ifdef ROBOT_DEBUG
+char msg_buf[50]; 
+#define PRINT(...) sprintf(msg_buf, __VA_ARGS__); Serial.println(msg_buf)
+#else
+#define PRINT(x)
+#endif
 
 Servo servo;
 Ultrasonic sonar(TRIG_PIN, ECHO_PIN);
@@ -30,14 +50,19 @@ uint32_t angleTimer = 0;
 float angles[3];
 uint8_t fifoBuffer[45];
 
+int leftSpeed = 0, rightSpeed = 0;
+
 void setupServo();
 void setupGyroscope();
 void setupMotors();
 void stopMotors();
+void setMotorSpeeds(int left, int right);
+void applyMotorSpeeds();
 void setLeftMotor(int speed);
 void setRightMotor(int speed);
 float getAngleZ();
-void setPeriodicSpeeds(int16_t left, int16_t right, uint16_t period);
+void applyPeriodicSpeeds(uint16_t period);
+uint16_t readDistance();
 
 
 void setupServo() {
@@ -50,6 +75,11 @@ void setupGyroscope() {
   mpu.initialize();
   mpu.dmpInitialize();
   mpu.setDMPEnabled(true);
+  
+  mpu.setZGyroOffset(12);
+  Serial.println("Waiting for gyro's settling (5 seconds)");
+  delay(5000);
+  Serial.println("Setup is completed");
 }
 
 void setupMotors() {
@@ -61,24 +91,19 @@ void setupMotors() {
   stopMotors();
 }
 
-void setLeftMotor(int speed) {
-  if (speed >= 0) {
-    analogWrite(L_MOTOR_IN1, speed);
-    digitalWrite(L_MOTOR_IN2, LOW);
-  } else {
-    analogWrite(L_MOTOR_IN1, speed);
-    digitalWrite(L_MOTOR_IN2, HIGH);
-  }
+void stopMotors() {
+  setLeftMotor(0);
+  setRightMotor(0);
 }
 
-void setRightMotor(int speed) {
-  if (speed >= 0) {
-    analogWrite(R_MOTOR_IN1, speed);
-    digitalWrite(R_MOTOR_IN2, LOW);
-  } else {
-    analogWrite(R_MOTOR_IN1, speed);
-    digitalWrite(R_MOTOR_IN2, HIGH);
-  }
+void setMotorSpeeds(int left, int right) {
+  leftSpeed = left;
+  rightSpeed = right;
+}
+
+void applyMotorSpeeds() {
+  setLeftMotor(leftSpeed);
+  setRightMotor(rightSpeed);
 }
 
 void setLeftMotor(int speed) {
@@ -116,17 +141,23 @@ float getAngleZ() {
   return angles[0];
 }
 
-void setPeriodicSpeeds(int16_t left, int16_t right, uint16_t period) {
+void applyPeriodicSpeeds(uint16_t period) {
   static bool flag = false;
   if (millis() - speedTimer >= period) {
     if (flag) {
       stopMotors();
     } else {
-      setLeftMotor(left);
-      setRightMotor(right);
+      setLeftMotor(leftSpeed);
+      setRightMotor(rightSpeed);
     }
 
+    PRINT("Applied left speed: ", leftSpeed);
+    PRINT("Applied right speed: ", rightSpeed);
     flag = !flag;
     speedTimer = millis();
   }
+}
+
+uint16_t readDistance() {
+  return 0;
 }
