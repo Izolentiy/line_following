@@ -27,6 +27,11 @@ void moveStraight() {
   setRightMotor(BASE_SPEED);
 }
 
+void moveBackwards(){
+  setLeftMotor(-BASE_SPEED);
+  setRightMotor(-BASE_SPEED);
+}
+
 void slightStraight(){
   setLeftMotor(MIN_SPEED);
   setRightMotor(MIN_SPEED);
