@@ -1,26 +1,15 @@
 #pragma once
 #include "common.h"
 
-bool shouldTurnLeft = true;
-bool rotatingRight = false;
-bool rotatingLeft = false;
-bool resetAngle = false;
-bool missionComplete = false;
-
-bool movingBack = true;
-bool movingForward = true;
-bool turningComplete = false;
-
-float initAngle = 0.0f, currAngle = 0.0f;
-
-enum ActionState {NOT_STARTED, IN_PROGRESS, ENDED};
+enum ActionState {NOT_STARTED, IN_PROGRESS, ENDING, ENDED, ABORTING, ABORTED};
 
 class Action {
   protected:
-    virtual bool shouldStop() {}
+    virtual ActionState checkState() { return IN_PROGRESS; }
     virtual void onStart() {}
     virtual void inLoop() {}
     virtual void onEnd() {}
+    virtual void onAbort() {}
   public:
     ActionState state = NOT_STARTED;
     void resetState() {
@@ -31,15 +20,21 @@ class Action {
       case NOT_STARTED:
         onStart();
         state = IN_PROGRESS;
+        break;
       case IN_PROGRESS:
-        if (shouldStop()) {
-          onEnd();
-          state = ENDED;
-        } else {
-          inLoop();
-          state = IN_PROGRESS;
-        }
+        inLoop();
+        state = checkState();
+        break;
+      case ENDING:
+        onEnd();
+        state = ENDED;
+        break;
+      case ABORTING: 
+        onAbort();
+        state = ABORTED;
+        break;
       case ENDED: break;
+      case ABORTED: break;
       }
       return state;
     }
@@ -47,93 +42,143 @@ class Action {
 
 class ComplexAction : public Action {
   protected:
-    Action *subAction = nullptr;
+    Action **subAction = nullptr;
     int subActionCount = 0;
     int index = 0;
-    bool shouldStop() override {
-      return index == subActionCount;
+    bool isCyclic = false;
+    bool abortOccured = false;
+    ActionState checkState() override {
+      if (abortOccured) return ABORTING;
+      if (index == subActionCount) {
+        if (isCyclic) index = 0;
+        else return ENDING;
+      }
+      return IN_PROGRESS;
     }
     void inLoop() override {
-      if (subAction[index].perform() == ENDED) {
-        subAction[index].resetState();
+      ActionState result = subAction[index]->perform();
+      if (result == ENDED) {
+        subAction[index]->resetState();
         ++index;
+      } else if (result == ABORTED) {
+        abortOccured = true;
       }
     }
   public:
-    ComplexAction(Action *subAction, int subActionCount) {
-      this->subAction = subAction;
+    ComplexAction(Action **steps, int subActionCount, bool isCyclic = false) {
+      this->subAction = steps;
       this->subActionCount = subActionCount;
+      this->isCyclic = isCyclic;
     }
 };
 
 
 // ##### ACTIONS ##### 
 
-
-class TurnLeft : public Action {
+class TurnInDirection : public Action {
   private:
-    bool shouldStop() override {
-      return currAngle < initAngle - PI_HALF+0.1f;
-    }
-    void onStart() override {
-      setMotorSpeeds(-BASE_SPEED, BASE_SPEED);
-      PRINT("start rotating left");
+    float direction = 0.0f;
+    ActionState checkState() override {
+      if (abs(initAngle+direction - currAngle) < 0.1f) return ENDING;
+      return IN_PROGRESS;
     }
     void inLoop() override {
       currAngle = getAngleZ();
+      if (initAngle+direction - currAngle > 0) {
+        setMotorSpeeds(TURN_SPEED, -TURN_SPEED);
+      } else {
+        setMotorSpeeds(-TURN_SPEED, TURN_SPEED);
+      }
       applyMotorSpeeds();
-      PRINT("turning left, current angle = %f", currAngle);
+    }
+    void onEnd() override {
+      initAngle += direction;
+      stopMotors();
+    }
+  public:
+    TurnInDirection(float direction) {
+      this->direction = direction;
+    }
+};
+TurnInDirection turnLeft(-PI_HALF);
+TurnInDirection turnRight(PI_HALF);
+
+class LinearMoveToDistance : public Action {
+  private:
+    int distance = 0;
+    int distanceAtStart = 0;
+    int currDistance = 0;
+    ActionState checkState() override {
+      if (abs(distanceAtStart-distance - currDistance) <= 2) return ENDING;
+      if (leftSpeed > 0 && currDistance < 15) return ABORTING;
+      return IN_PROGRESS;
+    }
+    void onStart() override {
+      distanceAtStart = distanceOn(FRONT);
+    }
+    void inLoop() override {
+      currDistance = distanceOn(FRONT);
+      currAngle = getAngleZ();
+      if (distanceAtStart-distance - currDistance > 0) {
+        adjustSpeedsToMoveBackward(130);
+      } else {
+        adjustSpeedsToMoveForward(130);
+      }
+      applyPeriodicSpeeds(75);
+      Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
+      PRINT("IN_LOOP desired distance: %d", distanceAtStart-distance);
+      PRINT("IN_LOOP current distance: %d", currDistance);
+      PRINT("IN_LOOP apply left speed: %d", leftSpeed);
+      PRINT("IN_LOOP apply right speed: %d", rightSpeed);
+    }
+    void onEnd() override {
+      stopMotors();
+      PRINT("END of linear movement");
+    }
+    void onAbort() override { 
+      stopMotors(); 
+      PRINT("ABORT of linear movement");
+    }
+  public:
+    LinearMoveToDistance(int distance) {
+      this->distance = distance;
+    }
+};
+LinearMoveToDistance moveBackwardShort(-7);
+LinearMoveToDistance moveForwardShort(9);
+
+class MoveForwardTillWall : public Action {
+  private:
+    ActionState checkState() override {
+      if (distanceOn(FRONT) < 25) return ENDING;
+      return IN_PROGRESS;
+    }
+    void inLoop() override {
+      currAngle = getAngleZ();
+      adjustSpeedsToMoveForward(BASE_SPEED);
+      applyMotorSpeeds();
+      Serial.print("moving forward currAngle: "); Serial.println(currAngle);
+      Serial.print("moving forward initAngle: "); Serial.println(initAngle);
       PRINT("left motor: %d", leftSpeed);
       PRINT("right motor: %d", rightSpeed);
     }
     void onEnd() override {
-      initAngle = -PI_HALF;
       stopMotors();
-      PRINT("end rotating left");
+      PRINT("END wall ahead found");
     }
-} turnLeft;
+} moveForwardTillWall;
 
-class MoveBackwardShort : public Action {
+class CheckSpaceInDirection : public Action {
   private:
-    bool shouldStop() override {
-      return ;
+    int direction = 0;
+    ActionState checkState() override {
+      if (distanceOn(direction) < 25) return ABORTING;
+      return ENDED;
     }
-    void onStart() override {}
-    void inLoop() override {}
-    void onEnd() override {}
-} moveBackwardShort;
-
-class MoveForward : public Action {
-  private:
-    bool shouldStop() override { return false; }
-    void onStart() override {}
-    void inLoop() override {}
-    void onEnd() override {}
-} moveForward;
-
-Action turnAroundActions[5] = {
-  moveBackwardShort,
-  turnLeft,
-  moveForward,
-  moveBackwardShort,
-  turnLeft
+  public:
+    CheckSpaceInDirection(int direction) {
+      this->direction = direction;
+    }
 };
-ComplexAction turnAround(turnAroundActions, 5);
-
-
-/**
- * 1. every action have a stop condition.
- * 2. action may have actions which should be called every loop cycle
- * 3. action may have actions which should be called before start
- * 4. action may have actions which should be called after end
- * 
- * algorithms are an ordered list of actions
- */
-void performTurningAroundToLeft() {
-  // backward
-  // turning left
-  // forward (need precise distance to front wall)
-  // backward (need precise distance to front wall)
-  // turning left
-  // complete
-}
+CheckSpaceInDirection checkSpaceOnLeft(LEFT);
+CheckSpaceInDirection checkSpaceOnRight(RIGHT);

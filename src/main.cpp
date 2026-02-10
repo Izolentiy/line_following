@@ -12,27 +12,38 @@ void setup() {
 }
 
 enum mode { LINE_FOLLOWING, MAZE_SOLVING, GARBAGE_COLLECTION };
-mode current_mode = GARBAGE_COLLECTION;
+mode currentMode = GARBAGE_COLLECTION;
+
+Action *garbageCollectionSteps[14] = {
+  &moveForwardTillWall,
+  &checkSpaceOnLeft,
+  
+  &moveBackwardShort,
+  &turnLeft,
+  &moveForwardShort,
+  &moveBackwardShort,
+  &turnLeft,
+
+  &moveForwardTillWall,
+  &checkSpaceOnRight,
+
+  &moveBackwardShort,
+  &turnRight,
+  &moveForwardShort,
+  &moveBackwardShort,
+  &turnRight
+};
+ComplexAction garbageCollection(garbageCollectionSteps, 14, true);
+
+LinearMoveToDistance moveBack(-30);
 
 void loop() {
 
-  turnLeft.perform();
-
-  // float angle = (getAngleZ() / PI * 180.0f);
-  // servo.write(90 + (int)angle);
-  // Serial.println(angle);
-
-  // currAngle = getAngleZ();
-  // adjustSpeedsToMoveStraight();
-  // applyMotorSpeeds();
-
-  // static uint32_t timer = millis();
-  // if (millis() - timer > 10000) {
-  //   timer = 0;
-  //   mpu.dmpInitialize();
-  //   mpu.setDMPEnabled(true);
-  // }
-
+  Serial.println("Hello");
+  // moveBack.perform();
+  // garbageCollection.perform();
+  // moveBackwardShort.perform();
+  
   // switch (current_mode) {
   // case LINE_FOLLOWING: lineFollowing(); break;
   // case MAZE_SOLVING: mazeSolving(); break;

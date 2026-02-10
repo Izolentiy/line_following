@@ -11,13 +11,9 @@ bool movingBack = true;
 bool movingForward = true;
 bool turningComplete = false;
 
-float initAngle = 0.0f, currAngle = 0.0f;
 
 void startRotatingToLeft();
 void startRotatingToRight();
-void adjustSpeedsToMoveForward();
-void adjustSpeedsToMoveBack();
-uint16_t distanceOn(int angle);
 void garbageCollection();
 
 
@@ -31,37 +27,9 @@ void startRotatingToRight() {
   setMotorSpeeds(TURN_SPEED, -TURN_SPEED);
 }
 
-void adjustSpeedsToMoveForward() {
-  float diffAngle = initAngle - currAngle;
-  int16_t diffTerm = (int16_t)(diffAngle/PI*TURN_STRENGTH);
-  if (diffAngle < 0) {
-    setMotorSpeeds(BASE_SPEED + diffTerm, BASE_SPEED);
-  } else {
-    setMotorSpeeds(BASE_SPEED, BASE_SPEED - diffTerm);
-  }
-}
-
-void adjustSpeedsToMoveBack() {
-  adjustSpeedsToMoveForward();
-  setMotorSpeeds(-leftSpeed, -rightSpeed);
-}
-
-uint16_t distanceOn(int angle) {
-  uint8_t initServoAngle = servo.read();
-  servo.write(angle);
-  delay(abs(initServoAngle - angle) * SERVO_DELAY_MS_PER_DEGREE);
-  uint16_t val = sonar.read();
-  PRINT("Distance at angle %f: %d", val);
-  return val;
-}
-
-uint16_t preciseDistanceOn(int angle) {
-  return 0;
-}
-
 void turningAround() {
   if (movingBack) {
-    if (distanceOn(AHEAD) > 25) {
+    if (distanceOn(FRONT) > 25) {
       movingBack = false;
       if (shouldTurnLeft) {
         startRotatingToLeft();
@@ -70,7 +38,7 @@ void turningAround() {
       }
       return;
     }
-    adjustSpeedsToMoveBack();
+    adjustSpeedsToMoveBackward();
   } else if (rotatingRight) {
     if (currAngle < initAngle + PI_HALF-0.1f) return;
     rotatingRight = false;
@@ -106,7 +74,7 @@ void garbageCollection() {
     rotatingLeft = false;
     resetAngle = true;
     setMotorSpeeds(0, 0);
-  } else if (distanceOn(AHEAD) < 20) {
+  } else if (distanceOn(FRONT) < 20) {
     setMotorSpeeds(0, 0);
     applyMotorSpeeds();
     if (shouldTurnLeft) {
