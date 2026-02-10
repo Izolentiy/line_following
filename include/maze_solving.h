@@ -1,4 +1,5 @@
 #pragma once
+#include "raw/concepts.h"
 #include "common.h"
 #include "line_following.h"
 
@@ -14,7 +15,7 @@ void mazeSolving() {
   if(sonar.read()<25){//разворачивается на 90 градусов вправо если видит перед собой стенку
     moveBackwards();
     delay(100);
-    staticRight();
+    turnRight.perform();
   }
 
   servo.write(180);
@@ -27,8 +28,5 @@ void mazeSolving() {
     delay(300);//время необходимое чтобы объехать стенку(нужно регулировать в зависимостиот лабиринта)
     stopMotors();
   }
-
-  moveStraight();// рывок вперёд
-  delay(200);
-  stopMotors();
+  moveForwardShort.perform();
 }

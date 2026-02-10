@@ -6,8 +6,8 @@ void moveStraight();
 void slightStraight();
 void sharpLeft();
 void sharpRight();
-void turnLeft();
-void turnRight();
+// void turnLeft();
+// void turnRight();
 void correctLeft();
 void correctRight();
 void staticLeft();
@@ -47,15 +47,15 @@ void sharpRight() {
   setRightMotor(-BASE_SPEED);
 }
 
-void turnLeft() {
-  setLeftMotor(BASE_SPEED - TURN_FACTOR);
-  setRightMotor(BASE_SPEED);
-}
+// void turnLeft() {
+//   setLeftMotor(BASE_SPEED - TURN_FACTOR);
+//   setRightMotor(BASE_SPEED);
+// }
 
-void turnRight() {
-  setLeftMotor(BASE_SPEED);
-  setRightMotor(BASE_SPEED - TURN_FACTOR);
-}
+// void turnRight() {
+//   setLeftMotor(BASE_SPEED);
+//   setRightMotor(BASE_SPEED - TURN_FACTOR);
+// }
 
 void correctLeft() {
   setLeftMotor(BASE_SPEED - TURN_FACTOR/2);
@@ -103,14 +103,14 @@ void lineFollowing() {
     // Перекресток - продолжаем движение
     moveStraight();
   } 
-  else if (s1 && s2) {
-    // Линия справа - поворот направо
-    turnLeft();
-  } 
-  else if (s3 && s4) {
-    // Линия слева - поворот налево
-    turnRight();
-  } 
+  // else if (s1 && s2) {
+  //   // Линия справа - поворот направо
+  //   turnLeft();
+  // } 
+  // else if (s3 && s4) {
+  //   // Линия слева - поворот налево
+  //   turnRight();
+  // } 
   else if (s4) {
     // Крайняя линия справа - резкий поворот направо
     sharpRight();
