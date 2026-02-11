@@ -22,11 +22,11 @@
 #define SONAR_DELAY_MS            50 // to prevent echo
 
 #define MAX_SPEED       255
-#define BASE_SPEED      100
+#define BASE_SPEED      120
 #define MIN_SPEED       100
-#define TURN_FACTOR     60 
+#define PERIODIC_SPEED  130
+#define TURN_SPEED      125
 #define TURN_STRENGTH   1600
-#define TURN_SPEED      150
 
 #define LEFT 180
 #define FRONT 90
@@ -63,11 +63,11 @@ void setupGyroscope();
 void setupMotors();
 void stopMotors();
 void setMotorSpeeds(int left, int right);
-void applyMotorSpeeds();
 void setLeftMotor(int speed);
 void setRightMotor(int speed);
-float getAngleZ();
+void applyMotorSpeeds();
 void applyPeriodicSpeeds(uint16_t period);
+float getAngleZ();
 void adjustSpeedsToMoveForward(int base);
 void adjustSpeedsToMoveBackward(int base);
 uint16_t distanceOn(int angle);

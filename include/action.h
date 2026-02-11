@@ -42,32 +42,32 @@ class Action {
 
 class ComplexAction : public Action {
   protected:
-    Action **subAction = nullptr;
-    int subActionCount = 0;
+    Action **steps = nullptr;
+    int stepCount = 0;
     int index = 0;
     bool isCyclic = false;
     bool abortOccured = false;
     ActionState checkState() override {
       if (abortOccured) return ABORTING;
-      if (index == subActionCount) {
+      if (index == stepCount) {
         if (isCyclic) index = 0;
         else return ENDING;
       }
       return IN_PROGRESS;
     }
     void inLoop() override {
-      ActionState result = subAction[index]->perform();
+      ActionState result = steps[index]->perform();
       if (result == ENDED) {
-        subAction[index]->resetState();
+        steps[index]->resetState();
         ++index;
       } else if (result == ABORTED) {
         abortOccured = true;
       }
     }
   public:
-    ComplexAction(Action **steps, int subActionCount, bool isCyclic = false) {
-      this->subAction = steps;
-      this->subActionCount = subActionCount;
+    ComplexAction(Action **steps, int stepCount, bool isCyclic = false) {
+      this->steps = steps;
+      this->stepCount = stepCount;
       this->isCyclic = isCyclic;
     }
 };
@@ -90,18 +90,21 @@ class TurnInDirection : public Action {
         setMotorSpeeds(-TURN_SPEED, TURN_SPEED);
       }
       applyMotorSpeeds();
+      Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
+      Serial.print("IN_LOOP desired angle: "); Serial.println(initAngle+direction);
+      PRINT("IN_LOOP apply left speed: %d", leftSpeed);
+      PRINT("IN_LOOP apply right speed: %d", rightSpeed);
     }
     void onEnd() override {
       initAngle += direction;
       stopMotors();
+      PRINT("END of rotation");
     }
   public:
     TurnInDirection(float direction) {
       this->direction = direction;
     }
 };
-TurnInDirection turnLeft(-PI_HALF);
-TurnInDirection turnRight(PI_HALF);
 
 class LinearMoveToDistance : public Action {
   private:
@@ -110,7 +113,7 @@ class LinearMoveToDistance : public Action {
     int currDistance = 0;
     ActionState checkState() override {
       if (abs(distanceAtStart-distance - currDistance) <= 2) return ENDING;
-      if (leftSpeed > 0 && currDistance < 15) return ABORTING;
+      if (leftSpeed > 0 && currDistance < 7) return ABORTING;
       return IN_PROGRESS;
     }
     void onStart() override {
@@ -120,9 +123,9 @@ class LinearMoveToDistance : public Action {
       currDistance = distanceOn(FRONT);
       currAngle = getAngleZ();
       if (distanceAtStart-distance - currDistance > 0) {
-        adjustSpeedsToMoveBackward(130);
+        adjustSpeedsToMoveBackward(PERIODIC_SPEED);
       } else {
-        adjustSpeedsToMoveForward(130);
+        adjustSpeedsToMoveForward(PERIODIC_SPEED);
       }
       applyPeriodicSpeeds(75);
       Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
@@ -144,8 +147,19 @@ class LinearMoveToDistance : public Action {
       this->distance = distance;
     }
 };
-LinearMoveToDistance moveBackwardShort(-7);
-LinearMoveToDistance moveForwardShort(9);
+
+class CheckSpaceInDirection : public Action {
+  private:
+    int direction = 0;
+    ActionState checkState() override {
+      if (distanceOn(direction) < 25) return ABORTING;
+      return ENDED;
+    }
+  public:
+    CheckSpaceInDirection(int direction) {
+      this->direction = direction;
+    }
+};
 
 class MoveForwardTillWall : public Action {
   private:
@@ -168,17 +182,10 @@ class MoveForwardTillWall : public Action {
     }
 } moveForwardTillWall;
 
-class CheckSpaceInDirection : public Action {
-  private:
-    int direction = 0;
-    ActionState checkState() override {
-      if (distanceOn(direction) < 25) return ABORTING;
-      return ENDED;
-    }
-  public:
-    CheckSpaceInDirection(int direction) {
-      this->direction = direction;
-    }
-};
+
+LinearMoveToDistance moveBackwardShort(-7);
+LinearMoveToDistance moveForwardShort(9);
+TurnInDirection turnLeft(-PI_HALF);
+TurnInDirection turnRight(PI_HALF);
 CheckSpaceInDirection checkSpaceOnLeft(LEFT);
 CheckSpaceInDirection checkSpaceOnRight(RIGHT);
