@@ -1,6 +1,8 @@
 #pragma once
 #include "common.h"
 
+#define WITH_AUTORESET 1
+
 enum ActionState {NOT_STARTED, IN_PROGRESS, ENDING, ENDED, ABORTING, ABORTED};
 
 class Action {
@@ -15,7 +17,7 @@ class Action {
     void resetState() {
       state = NOT_STARTED;
     }
-    ActionState perform() {
+    ActionState perform(bool autoReset = 0) {
       switch (state) {
       case NOT_STARTED:
         onStart();
@@ -27,10 +29,18 @@ class Action {
         break;
       case ENDING:
         onEnd();
+        if (autoReset) {
+          state = NOT_STARTED;
+          return ENDED;
+        }
         state = ENDED;
         break;
       case ABORTING: 
         onAbort();
+        if (autoReset) {
+          state = NOT_STARTED;
+          return ABORTED;
+        }
         state = ABORTED;
         break;
       case ENDED: break;
@@ -48,7 +58,7 @@ class ComplexAction : public Action {
     bool isCyclic = false;
     bool abortOccured = false;
     ActionState checkState() override {
-      if (abortOccured) return ABORTING;
+      if (abortOccured) return ENDING;
       if (index == stepCount) {
         if (isCyclic) index = 0;
         else return ENDING;
@@ -72,6 +82,13 @@ class ComplexAction : public Action {
     }
 };
 
+void blockingPerform(Action *action) {
+  ActionState result;
+  do {
+    result = action->perform(WITH_AUTORESET);
+    PRINT("%d",int(result));
+  } while (result != ENDED && result != ABORTED);
+}
 
 // ##### ACTIONS ##### 
 
@@ -79,8 +96,18 @@ class TurnInDirection : public Action {
   private:
     float direction = 0.0f;
     ActionState checkState() override {
-      if (abs(initAngle+direction - currAngle) < 0.1f) return ENDING;
+      if (abs(initAngle+direction - currAngle) < ANGLE_TOLERANCE) {
+        stopMotors();
+        delay(50);
+        currAngle = getAngleZ();
+        if (abs(initAngle+direction - currAngle) > ANGLE_TOLERANCE) return IN_PROGRESS; 
+        PRINT("ENDING of rotation: %d", millis());
+        return ENDING;
+      }
       return IN_PROGRESS;
+    }
+    void onStart() override {
+      PRINT("\nSTART of rotation\n");
     }
     void inLoop() override {
       currAngle = getAngleZ();
@@ -89,7 +116,7 @@ class TurnInDirection : public Action {
       } else {
         setMotorSpeeds(-TURN_SPEED, TURN_SPEED);
       }
-      applyMotorSpeeds();
+      applyPeriodicSpeeds(75);
       Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
       Serial.print("IN_LOOP desired angle: "); Serial.println(initAngle+direction);
       PRINT("IN_LOOP apply left speed: %d", leftSpeed);
@@ -98,7 +125,7 @@ class TurnInDirection : public Action {
     void onEnd() override {
       initAngle += direction;
       stopMotors();
-      PRINT("END of rotation");
+      PRINT("END of rotation: %d", millis());
     }
   public:
     TurnInDirection(float direction) {
@@ -113,19 +140,23 @@ class LinearMoveToDistance : public Action {
     int currDistance = 0;
     ActionState checkState() override {
       if (abs(distanceAtStart-distance - currDistance) <= 2) return ENDING;
-      if (leftSpeed > 0 && currDistance < 7) return ABORTING;
+      if (distanceAtStart-distance <= 4 && currDistance < 6) return ABORTING;
       return IN_PROGRESS;
     }
     void onStart() override {
       distanceAtStart = distanceOn(FRONT);
+      PRINT("\nSTART of linear movement\n");
     }
     void inLoop() override {
       currDistance = distanceOn(FRONT);
       currAngle = getAngleZ();
-      if (distanceAtStart-distance - currDistance > 0) {
-        adjustSpeedsToMoveBackward(PERIODIC_SPEED);
+      int distanceDiff = distanceAtStart-distance - currDistance;
+      int speed = PERIODIC_SPEED;
+      // if (abs(distanceDiff) < 10) speed = MIN_SPEED;
+      if (distanceDiff > 0) {
+        adjustSpeedsToMoveBackward(speed);
       } else {
-        adjustSpeedsToMoveForward(PERIODIC_SPEED);
+        adjustSpeedsToMoveForward(speed);
       }
       applyPeriodicSpeeds(75);
       Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
@@ -182,10 +213,5 @@ class MoveForwardTillWall : public Action {
     }
 } moveForwardTillWall;
 
-
-LinearMoveToDistance moveBackwardShort(-7);
-LinearMoveToDistance moveForwardShort(9);
 TurnInDirection turnLeft(-PI_HALF);
 TurnInDirection turnRight(PI_HALF);
-CheckSpaceInDirection checkSpaceOnLeft(LEFT);
-CheckSpaceInDirection checkSpaceOnRight(RIGHT);

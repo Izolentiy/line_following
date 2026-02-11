@@ -3,16 +3,14 @@
 #include "action.h"
 
 void mazeSolving();
-void resetStates();
+void mazeSolvingLeft();
+void mazeSolvingRight();
 
 LinearMoveToDistance moveStraight15cm(15);
 LinearMoveToDistance moveBack3cm(-3);
 LinearMoveToDistance moveBack10cm(-10);
-LinearMoveToDistance moveStraight10cm(10);
+LinearMoveToDistance moveStraight8cm(8);
 LinearMoveToDistance moveStraight3cm(3);
-
-TurnInDirection turnRight45deg(PI_HALF/2.0f);
-TurnInDirection turnRight180deg(PI);
 
 /**
  * можно ли рассматривать задачу прохождения лабиринта как
@@ -32,26 +30,35 @@ TurnInDirection turnRight180deg(PI);
  * - поворачиваем еще на 30 градусов
  */
 void mazeSolving() {
-  resetStates();
+  mazeSolvingLeft();
+}
 
+void mazeSolvingLeft() {
   if (preciseDistanceOn(LEFT) > 30) {
-    while (moveStraight10cm.perform() != ENDED);
-    while (turnLeft.perform() != ENDED);
-    while (moveStraight15cm.perform() != ENDED);
-  } else if (preciseDistanceOn(FRONT) < 13) {
-    while (turnRight180deg.perform() != ENDED);
-    while (moveBack10cm.perform() != ENDED);
-    while (turnLeft.perform() != ENDED);
+    PRINT("\nTURNING LEFT\n");
+    blockingPerform(&moveStraight8cm);
+    blockingPerform(&turnLeft);
+    blockingPerform(&moveStraight15cm);
+  } else if (preciseDistanceOn(FRONT) < 10) {
+    PRINT("\nTURNING RIGHT\n");
+    blockingPerform(&turnRight);
   } else {
-    while(moveStraight3cm.perform() != ENDED);
+    PRINT("\nMOVING FORWARD\n");
+    blockingPerform(&moveStraight3cm);
   }
 }
 
-void resetStates() {
-  moveStraight15cm.resetState();
-  moveBack3cm.resetState();
-  moveStraight10cm.resetState();
-  moveStraight3cm.resetState();
-  turnLeft.resetState();
-  turnRight.resetState();
+void mazeSolvingRight() {
+  if (preciseDistanceOn(RIGHT) > 30) {
+    PRINT("\nTURNING RIGHT\n");
+    blockingPerform(&moveStraight8cm);
+    blockingPerform(&turnRight);
+    blockingPerform(&moveStraight15cm);
+  } else if (preciseDistanceOn(FRONT) < 10) {
+    PRINT("\nTURNING RIGHT\n");
+    blockingPerform(&turnLeft);
+  } else {
+    PRINT("\nMOVING FORWARD\n");
+    blockingPerform(&moveStraight3cm);
+  }
 }

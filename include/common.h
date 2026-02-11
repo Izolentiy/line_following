@@ -24,11 +24,18 @@
 #define MAX_SPEED       255
 #define BASE_SPEED      120
 #define MIN_SPEED       100
-#define PERIODIC_SPEED  130
-#define TURN_SPEED      125
+#define PERIODIC_SPEED  150 // maze solving
+// #define PERIODIC_SPEED  150 // garbage collection
+// #define TURN_SPEED      125 // maze solving
+#define TURN_SPEED      150 // garbage collection
 #define TURN_STRENGTH   1600
 
-#define LEFT 180
+// #define Z_GYRO_OFFSET 18 // maze solving?
+#define Z_GYRO_OFFSET 9
+#define ANGLE_TOLERANCE 0.08f // maze solving
+#define ANGLE_TOLERANCE 0.1f
+
+#define LEFT  180
 #define FRONT 90
 #define RIGHT 0
 
@@ -85,7 +92,7 @@ void setupGyroscope() {
   mpu.dmpInitialize();
   mpu.setDMPEnabled(true);
   
-  mpu.setZGyroOffset(12);
+  mpu.setZGyroOffset(Z_GYRO_OFFSET);
   Serial.println("Waiting for gyro's settling (5 seconds)");
   delay(5000);
   Serial.println("Setup is completed");
@@ -213,8 +220,11 @@ uint16_t preciseDistanceOn(int angle) {
   // if (millis() - sonarTimer > SONAR_DELAY_MS) {
   //   sonarTimer = millis();
   // }
-  delay(max(abs(initServoAngle - angle) * SERVO_DELAY_MS_PER_DEGREE, SONAR_DELAY_MS));
-  uint16_t val = sonar.read();
+  uint16_t val;
+  do {
+    delay(max(abs(initServoAngle - angle) * SERVO_DELAY_MS_PER_DEGREE, SONAR_DELAY_MS));
+    val = sonar.read();
+  } while(val < 1);
   PRINT("Distance at angle %d: %d (%d)", angle, val, millis());
   return val;
 }
