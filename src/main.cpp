@@ -1,6 +1,7 @@
 // #include "line_following.h"
-// #include "maze_solving.h"
-#include "garbage_collection.h"
+#include "maze_solving.h"
+// #include "stupid_maze_solving.h"
+// #include "garbage_collection.h"
 
 void setup() {
   Serial.begin(9600);
@@ -11,7 +12,9 @@ void setup() {
 }
 
 void loop() {
+  // solution_1();
+
   // lineFollowing();
-  // mazeSolving();
-  garbageCollection();
+  mazeSolving();
+  // garbageCollection();
 }

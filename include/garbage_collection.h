@@ -53,9 +53,9 @@ class MoveToExit : public Action {
           blockingPerform(&moveStraight11cm);
           blockingPerform(&moveBackward7cm);
           blockingPerform(&turnRight);
-          blockingPerform(&moveStraight15cm);
+          blockingPerform(&moveStraight5cm);
         } else if (preciseDistanceOn(FRONT) < 10) {
-          PRINT("\nTURNING RIGHT\n");
+          PRINT("\nTURNING LEFT\n");
           blockingPerform(&moveBackward7cm);
           blockingPerform(&turnLeft);
         } else {
@@ -68,7 +68,7 @@ class MoveToExit : public Action {
           blockingPerform(&moveStraight11cm);
           blockingPerform(&moveBackward7cm);
           blockingPerform(&turnLeft);
-          blockingPerform(&moveStraight15cm);
+          blockingPerform(&moveStraight5cm);
         } else if (preciseDistanceOn(FRONT) < 10) {
           PRINT("\nTURNING RIGHT\n");
           blockingPerform(&moveBackward7cm);

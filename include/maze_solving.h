@@ -6,54 +6,72 @@ void mazeSolving();
 void mazeSolvingLeft();
 void mazeSolvingRight();
 
-LinearMoveToDistance moveStraight15cm(15);
-LinearMoveToDistance moveBack3cm(-3);
-LinearMoveToDistance moveBack10cm(-10);
-LinearMoveToDistance moveStraight8cm(8);
-LinearMoveToDistance moveStraight3cm(3);
+LinearMoveByTimer moveStraight3cm(150);
+LinearMoveByTimer moveStraight5cm(250);
+LinearMoveByTimer moveStraight6cm(300);
+LinearMoveByTimer moveBack3cm(150, false);
+LinearMoveByTimer moveBack10cm(500, false);
 
-/**
- * можно ли рассматривать задачу прохождения лабиринта как
- * задачу удержания расстояния от левой стены на фиксированном значении,
- * при постоянном движении вперед?
- * 
- * зададим движение вперед при удержании расстояния от правой стены
- * в определенном промежутке.
- * - смотрим текущий угол поворота.
- * 
- * 
- * поворот
- * - поворачиваемся на 30 градусов
- * - поворачиваем сонар на 30 градусов,чтобы он смотрел на стену
- * - если расстояние увелчилось, двигаемся вперед пока расстояние не то которое нужно
- * - отслеживаем смещение по X?
- * - поворачиваем еще на 30 градусов
- */
 void mazeSolving() {
   mazeSolvingLeft();
 }
 
+int freeLeft = 0;
+int freeRight = 0;
+int lastDistanceFront = 0;
+int stuckCounter = 0;
+bool needToMoveForward = false;
+
 void mazeSolvingLeft() {
-  if (preciseDistanceOn(LEFT) > 30) {
-    PRINT("\nTURNING LEFT\n");
-    blockingPerform(&moveStraight8cm);
-    blockingPerform(&turnLeft);
-    blockingPerform(&moveStraight15cm);
-  } else if (preciseDistanceOn(FRONT) < 10) {
-    PRINT("\nTURNING RIGHT\n");
+  int distanceLeft = preciseDistanceOn(LEFT);
+  int distanceFront = preciseDistanceOn(FRONT);
+
+  if (distanceLeft > 30) {
+    if (needToMoveForward) {
+      blockingPerform(&turnRight);
+      blockingPerform(&moveStraight3cm);
+      blockingPerform(&turnLeft);
+      blockingPerform(&moveStraight3cm);
+    }
+    if (freeLeft > 0) {
+      blockingPerform(&turnLeft);
+      blockingPerform(&moveStraight5cm);
+      freeLeft = 0;
+      needToMoveForward = true;
+    } else {
+      freeLeft++;
+    }
+  } else if (distanceFront < 10) {
     blockingPerform(&turnRight);
+    needToMoveForward = false;
+    return;
   } else {
-    PRINT("\nMOVING FORWARD\n");
-    blockingPerform(&moveStraight3cm);
+    needToMoveForward = false;
   }
+  if (abs(lastDistanceFront - distanceFront) < 2) {
+    stuckCounter++;
+  } else {
+    stuckCounter = 0;
+  }
+  if (stuckCounter > 2) {
+    blockingPerform(&moveBack3cm);
+    blockingPerform(&turnLeft);
+    blockingPerform(&moveStraight5cm);
+    blockingPerform(&turnRight);
+
+    stuckCounter = 0;
+  }
+  blockingPerform(&moveStraight3cm);
+  
+  lastDistanceFront = distanceFront;
 }
 
 void mazeSolvingRight() {
   if (preciseDistanceOn(RIGHT) > 30) {
     PRINT("\nTURNING RIGHT\n");
-    blockingPerform(&moveStraight8cm);
+    blockingPerform(&moveStraight6cm);
     blockingPerform(&turnRight);
-    blockingPerform(&moveStraight15cm);
+    blockingPerform(&moveStraight5cm);
   } else if (preciseDistanceOn(FRONT) < 10) {
     PRINT("\nTURNING RIGHT\n");
     blockingPerform(&turnLeft);

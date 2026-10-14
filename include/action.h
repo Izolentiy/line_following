@@ -82,12 +82,13 @@ class ComplexAction : public Action {
     }
 };
 
-void blockingPerform(Action *action) {
+ActionState blockingPerform(Action *action) {
   ActionState result;
   do {
     result = action->perform(WITH_AUTORESET);
     PRINT("%d",int(result));
   } while (result != ENDED && result != ABORTED);
+  return result;
 }
 
 // ##### ACTIONS ##### 
@@ -138,17 +139,21 @@ class LinearMoveToDistance : public Action {
     int distance = 0;
     int distanceAtStart = 0;
     int currDistance = 0;
+    int startTime = 0;
     ActionState checkState() override {
+      // if (millis() - startTime > abs(distance) * 700) return ABORTING;
       if (abs(distanceAtStart-distance - currDistance) <= 2) return ENDING;
       if (distanceAtStart-distance <= 4 && currDistance < 6) return ABORTING;
       return IN_PROGRESS;
     }
     void onStart() override {
+      startTime = millis();
       distanceAtStart = distanceOn(FRONT);
       PRINT("\nSTART of linear movement\n");
     }
     void inLoop() override {
-      currDistance = distanceOn(FRONT);
+      stopMotors();
+      currDistance = preciseDistanceOn(FRONT);
       currAngle = getAngleZ();
       int distanceDiff = distanceAtStart-distance - currDistance;
       int speed = PERIODIC_SPEED;
@@ -176,6 +181,41 @@ class LinearMoveToDistance : public Action {
   public:
     LinearMoveToDistance(int distance) {
       this->distance = distance;
+    }
+};
+
+class LinearMoveByTimer : public Action {
+  private:
+    unsigned long startTime = 0;
+    unsigned long moveTime = 0;
+    bool straight = true;
+    ActionState checkState() override {
+      if (millis() - startTime > moveTime) return ENDING;
+      return IN_PROGRESS;
+    }
+    void onStart() override {
+      startTime = millis();
+    }
+    void inLoop() override {
+      currAngle = getAngleZ();
+      if (straight) {
+        adjustSpeedsToMoveForward(BASE_SPEED);
+      } else {
+        adjustSpeedsToMoveBackward(BASE_SPEED);
+      }
+      applyMotorSpeeds();
+      Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
+      PRINT("IN_LOOP apply left speed: %d", leftSpeed);
+      PRINT("IN_LOOP apply right speed: %d", rightSpeed);
+    }
+    void onEnd() override {
+      stopMotors();
+      PRINT("END of linear movement");
+    }
+  public:
+    LinearMoveByTimer(unsigned long moveTime, bool straight = true) {
+      this->moveTime = moveTime;
+      this->straight = straight;
     }
 };
 

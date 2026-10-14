@@ -19,21 +19,23 @@
 
 #define SERVO_DELAY_MS            200
 #define SERVO_DELAY_MS_PER_DEGREE 2
-#define SONAR_DELAY_MS            50 // to prevent echo
+#define SONAR_DELAY_MS            100 // to prevent echo
 
 #define MAX_SPEED       255
-#define BASE_SPEED      120
+#define BASE_SPEED      150
 #define MIN_SPEED       100
 #define PERIODIC_SPEED  150 // maze solving
 // #define PERIODIC_SPEED  150 // garbage collection
 // #define TURN_SPEED      125 // maze solving
-#define TURN_SPEED      150 // garbage collection
+// #define TURN_SPEED      150 // garbage collection
+#define TURN_SPEED      130 // garbage collection
 #define TURN_STRENGTH   1600
 
 // #define Z_GYRO_OFFSET 18 // maze solving?
 #define Z_GYRO_OFFSET 9
 #define ANGLE_TOLERANCE 0.08f // maze solving
-#define ANGLE_TOLERANCE 0.1f
+// #define ANGLE_TOLERANCE 0.1f
+#define ANGLE_TOLERANCE 0.15f
 
 #define LEFT  180
 #define FRONT 90
