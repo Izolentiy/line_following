@@ -1,7 +1,7 @@
 #pragma once
 #include "common.h"
 
-#define WITH_AUTORESET 1
+#define WITH_AUTORESET true
 
 enum ActionState {NOT_STARTED, IN_PROGRESS, ENDING, ENDED, ABORTING, ABORTED};
 
@@ -17,7 +17,7 @@ class Action {
     void resetState() {
       state = NOT_STARTED;
     }
-    ActionState perform(bool autoReset = 0) {
+    ActionState perform(bool autoReset = false) {
       switch (state) {
       case NOT_STARTED:
         onStart();
@@ -35,7 +35,7 @@ class Action {
         }
         state = ENDED;
         break;
-      case ABORTING: 
+      case ABORTING:
         onAbort();
         if (autoReset) {
           state = NOT_STARTED;
@@ -43,8 +43,9 @@ class Action {
         }
         state = ABORTED;
         break;
-      case ENDED: break;
-      case ABORTED: break;
+      case ENDED:
+      case ABORTED:
+        break;
       }
       return state;
     }
@@ -75,33 +76,29 @@ class ComplexAction : public Action {
       }
     }
   public:
-    ComplexAction(Action **steps, int stepCount, bool isCyclic = false) {
-      this->steps = steps;
-      this->stepCount = stepCount;
-      this->isCyclic = isCyclic;
-    }
+    ComplexAction(Action **steps, int stepCount, bool isCyclic = false)
+      : steps(steps), stepCount(stepCount), isCyclic(isCyclic) {}
 };
 
 ActionState blockingPerform(Action *action) {
   ActionState result;
   do {
     result = action->perform(WITH_AUTORESET);
-    PRINT("%d",int(result));
   } while (result != ENDED && result != ABORTED);
   return result;
 }
 
-// ##### ACTIONS ##### 
+// ##### ACTIONS #####
 
 class TurnInDirection : public Action {
   private:
     float direction = 0.0f;
     ActionState checkState() override {
-      if (abs(initAngle+direction - currAngle) < ANGLE_TOLERANCE) {
+      if (abs(initAngle + direction - currAngle) < ANGLE_TOLERANCE) {
         stopMotors();
         delay(50);
         currAngle = getAngleZ();
-        if (abs(initAngle+direction - currAngle) > ANGLE_TOLERANCE) return IN_PROGRESS; 
+        if (abs(initAngle + direction - currAngle) > ANGLE_TOLERANCE) return IN_PROGRESS;
         PRINT("ENDING of rotation: %d", millis());
         return ENDING;
       }
@@ -112,16 +109,15 @@ class TurnInDirection : public Action {
     }
     void inLoop() override {
       currAngle = getAngleZ();
-      if (initAngle+direction - currAngle > 0) {
+      if (initAngle + direction - currAngle > 0) {
         setMotorSpeeds(TURN_SPEED, -TURN_SPEED);
       } else {
         setMotorSpeeds(-TURN_SPEED, TURN_SPEED);
       }
       applyPeriodicSpeeds(75);
-      Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
-      Serial.print("IN_LOOP desired angle: "); Serial.println(initAngle+direction);
-      PRINT("IN_LOOP apply left speed: %d", leftSpeed);
-      PRINT("IN_LOOP apply right speed: %d", rightSpeed);
+      printValue("IN_LOOP current angle: ", currAngle);
+      printValue("IN_LOOP desired angle: ", initAngle + direction);
+      PRINT("IN_LOOP speeds: %d %d", leftSpeed, rightSpeed);
     }
     void onEnd() override {
       initAngle += direction;
@@ -129,9 +125,7 @@ class TurnInDirection : public Action {
       PRINT("END of rotation: %d", millis());
     }
   public:
-    TurnInDirection(float direction) {
-      this->direction = direction;
-    }
+    TurnInDirection(float direction) : direction(direction) {}
 };
 
 class LinearMoveToDistance : public Action {
@@ -139,15 +133,12 @@ class LinearMoveToDistance : public Action {
     int distance = 0;
     int distanceAtStart = 0;
     int currDistance = 0;
-    int startTime = 0;
     ActionState checkState() override {
-      // if (millis() - startTime > abs(distance) * 700) return ABORTING;
-      if (abs(distanceAtStart-distance - currDistance) <= 2) return ENDING;
-      if (distanceAtStart-distance <= 4 && currDistance < 6) return ABORTING;
+      if (abs(distanceAtStart - distance - currDistance) <= 2) return ENDING;
+      if (distanceAtStart - distance <= 4 && currDistance < 6) return ABORTING;
       return IN_PROGRESS;
     }
     void onStart() override {
-      startTime = millis();
       distanceAtStart = distanceOn(FRONT);
       PRINT("\nSTART of linear movement\n");
     }
@@ -155,33 +146,28 @@ class LinearMoveToDistance : public Action {
       stopMotors();
       currDistance = preciseDistanceOn(FRONT);
       currAngle = getAngleZ();
-      int distanceDiff = distanceAtStart-distance - currDistance;
-      int speed = PERIODIC_SPEED;
-      // if (abs(distanceDiff) < 10) speed = MIN_SPEED;
+      int distanceDiff = distanceAtStart - distance - currDistance;
       if (distanceDiff > 0) {
-        adjustSpeedsToMoveBackward(speed);
+        adjustSpeedsToMoveBackward(PERIODIC_SPEED);
       } else {
-        adjustSpeedsToMoveForward(speed);
+        adjustSpeedsToMoveForward(PERIODIC_SPEED);
       }
       applyPeriodicSpeeds(75);
-      Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
-      PRINT("IN_LOOP desired distance: %d", distanceAtStart-distance);
+      printValue("IN_LOOP current angle: ", currAngle);
+      PRINT("IN_LOOP desired distance: %d", distanceAtStart - distance);
       PRINT("IN_LOOP current distance: %d", currDistance);
-      PRINT("IN_LOOP apply left speed: %d", leftSpeed);
-      PRINT("IN_LOOP apply right speed: %d", rightSpeed);
+      PRINT("IN_LOOP speeds: %d %d", leftSpeed, rightSpeed);
     }
     void onEnd() override {
       stopMotors();
       PRINT("END of linear movement");
     }
-    void onAbort() override { 
-      stopMotors(); 
+    void onAbort() override {
+      stopMotors();
       PRINT("ABORT of linear movement");
     }
   public:
-    LinearMoveToDistance(int distance) {
-      this->distance = distance;
-    }
+    LinearMoveToDistance(int distance) : distance(distance) {}
 };
 
 class LinearMoveByTimer : public Action {
@@ -198,25 +184,19 @@ class LinearMoveByTimer : public Action {
     }
     void inLoop() override {
       currAngle = getAngleZ();
-      if (straight) {
-        adjustSpeedsToMoveForward(BASE_SPEED);
-      } else {
-        adjustSpeedsToMoveBackward(BASE_SPEED);
-      }
+      if (straight) adjustSpeedsToMoveForward(BASE_SPEED);
+      else adjustSpeedsToMoveBackward(BASE_SPEED);
       applyMotorSpeeds();
-      Serial.print("IN_LOOP current angle: "); Serial.println(currAngle);
-      PRINT("IN_LOOP apply left speed: %d", leftSpeed);
-      PRINT("IN_LOOP apply right speed: %d", rightSpeed);
+      printValue("IN_LOOP current angle: ", currAngle);
+      PRINT("IN_LOOP speeds: %d %d", leftSpeed, rightSpeed);
     }
     void onEnd() override {
       stopMotors();
       PRINT("END of linear movement");
     }
   public:
-    LinearMoveByTimer(unsigned long moveTime, bool straight = true) {
-      this->moveTime = moveTime;
-      this->straight = straight;
-    }
+    LinearMoveByTimer(unsigned long moveTime, bool straight = true)
+      : moveTime(moveTime), straight(straight) {}
 };
 
 class CheckSpaceInDirection : public Action {
@@ -227,9 +207,7 @@ class CheckSpaceInDirection : public Action {
       return ENDED;
     }
   public:
-    CheckSpaceInDirection(int direction) {
-      this->direction = direction;
-    }
+    CheckSpaceInDirection(int direction) : direction(direction) {}
 };
 
 class MoveForwardTillWall : public Action {
@@ -242,10 +220,9 @@ class MoveForwardTillWall : public Action {
       currAngle = getAngleZ();
       adjustSpeedsToMoveForward(BASE_SPEED);
       applyMotorSpeeds();
-      Serial.print("moving forward currAngle: "); Serial.println(currAngle);
-      Serial.print("moving forward initAngle: "); Serial.println(initAngle);
-      PRINT("left motor: %d", leftSpeed);
-      PRINT("right motor: %d", rightSpeed);
+      printValue("moving forward currAngle: ", currAngle);
+      printValue("moving forward initAngle: ", initAngle);
+      PRINT("speeds: %d %d", leftSpeed, rightSpeed);
     }
     void onEnd() override {
       stopMotors();
@@ -255,3 +232,7 @@ class MoveForwardTillWall : public Action {
 
 TurnInDirection turnLeft(-PI_HALF);
 TurnInDirection turnRight(PI_HALF);
+
+// short timed moves shared by the maze and garbage collection modes
+LinearMoveByTimer moveStraight3cm(150);
+LinearMoveByTimer moveStraight5cm(250);

@@ -1,7 +1,14 @@
-// #include "line_following.h"
+// #define MODE_LINE_FOLLOWING
+#define MODE_MAZE_SOLVING
+// #define MODE_GARBAGE_COLLECTION
+
+#if defined(MODE_LINE_FOLLOWING)
+#include "line_following.h"
+#elif defined(MODE_MAZE_SOLVING)
 #include "maze_solving.h"
-// #include "stupid_maze_solving.h"
-// #include "garbage_collection.h"
+#elif defined(MODE_GARBAGE_COLLECTION)
+#include "garbage_collection.h"
+#endif
 
 void setup() {
   Serial.begin(9600);
@@ -9,12 +16,17 @@ void setup() {
   setupGyroscope();
   setupMotors();
   setupServo();
+#ifdef MODE_LINE_FOLLOWING
+  setupLineSensors();
+#endif
 }
 
 void loop() {
-  // solution_1();
-
-  // lineFollowing();
+#if defined(MODE_LINE_FOLLOWING)
+  lineFollowing();
+#elif defined(MODE_MAZE_SOLVING)
   mazeSolving();
-  // garbageCollection();
+#elif defined(MODE_GARBAGE_COLLECTION)
+  garbageCollection();
+#endif
 }

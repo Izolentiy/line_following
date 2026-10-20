@@ -2,26 +2,15 @@
 #include "common.h"
 #include "action.h"
 
-void mazeSolving();
-void mazeSolvingLeft();
-void mazeSolvingRight();
-
-LinearMoveByTimer moveStraight3cm(150);
-LinearMoveByTimer moveStraight5cm(250);
 LinearMoveByTimer moveStraight6cm(300);
 LinearMoveByTimer moveBack3cm(150, false);
-LinearMoveByTimer moveBack10cm(500, false);
-
-void mazeSolving() {
-  mazeSolvingLeft();
-}
 
 int freeLeft = 0;
-int freeRight = 0;
 int lastDistanceFront = 0;
 int stuckCounter = 0;
 bool needToMoveForward = false;
 
+// left-hand rule
 void mazeSolvingLeft() {
   int distanceLeft = preciseDistanceOn(LEFT);
   int distanceFront = preciseDistanceOn(FRONT);
@@ -48,6 +37,8 @@ void mazeSolvingLeft() {
   } else {
     needToMoveForward = false;
   }
+
+  // the front distance doesn't change - the robot is stuck
   if (abs(lastDistanceFront - distanceFront) < 2) {
     stuckCounter++;
   } else {
@@ -58,14 +49,14 @@ void mazeSolvingLeft() {
     blockingPerform(&turnLeft);
     blockingPerform(&moveStraight5cm);
     blockingPerform(&turnRight);
-
     stuckCounter = 0;
   }
   blockingPerform(&moveStraight3cm);
-  
+
   lastDistanceFront = distanceFront;
 }
 
+// right-hand rule
 void mazeSolvingRight() {
   if (preciseDistanceOn(RIGHT) > 30) {
     PRINT("\nTURNING RIGHT\n");
@@ -73,10 +64,14 @@ void mazeSolvingRight() {
     blockingPerform(&turnRight);
     blockingPerform(&moveStraight5cm);
   } else if (preciseDistanceOn(FRONT) < 10) {
-    PRINT("\nTURNING RIGHT\n");
+    PRINT("\nTURNING LEFT\n");
     blockingPerform(&turnLeft);
   } else {
     PRINT("\nMOVING FORWARD\n");
     blockingPerform(&moveStraight3cm);
   }
+}
+
+void mazeSolving() {
+  mazeSolvingLeft();
 }

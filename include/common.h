@@ -5,6 +5,7 @@
 #include <I2Cdev.h>
 #include <MPU6050_6Axis_MotionApps20.h>
 
+// ##### PINS #####
 #define TRIG_PIN        2   // D2
 #define ECHO_PIN        3   // D3
 #define SERVO_PIN       4   // D4
@@ -17,75 +18,59 @@
 #define S_LEFT          11  // IN3 -> D11
 #define S_LEFT_MOST     12  // IN4 -> D12
 
-#define SERVO_DELAY_MS            200
+// ##### TIMINGS #####
 #define SERVO_DELAY_MS_PER_DEGREE 2
 #define SONAR_DELAY_MS            100 // to prevent echo
 
-#define MAX_SPEED       255
+// ##### MOTION #####
 #define BASE_SPEED      150
-#define MIN_SPEED       100
-#define PERIODIC_SPEED  150 // maze solving
-// #define PERIODIC_SPEED  150 // garbage collection
-// #define TURN_SPEED      125 // maze solving
-// #define TURN_SPEED      150 // garbage collection
-#define TURN_SPEED      130 // garbage collection
+#define PERIODIC_SPEED  150
+#define TURN_SPEED      130
 #define TURN_STRENGTH   1600
 
-// #define Z_GYRO_OFFSET 18 // maze solving?
-#define Z_GYRO_OFFSET 9
-#define ANGLE_TOLERANCE 0.08f // maze solving
-// #define ANGLE_TOLERANCE 0.1f
+#define Z_GYRO_OFFSET   9
 #define ANGLE_TOLERANCE 0.15f
 
+// servo angles
 #define LEFT  180
 #define FRONT 90
 #define RIGHT 0
 
 #define PI_HALF 1.570796f
 
+// ##### DEBUG OUTPUT #####
 #define ROBOT_DEBUG
 #ifdef ROBOT_DEBUG
-char msg_buf[50]; 
-#define PRINT(...) sprintf(msg_buf, __VA_ARGS__); Serial.println(msg_buf)
+char msg_buf[50];
+#define PRINT(...) do { sprintf(msg_buf, __VA_ARGS__); Serial.println(msg_buf); } while (0)
+// sprintf on AVR has no float support
+void printValue(const char *label, float value) {
+  Serial.print(label);
+  Serial.println(value);
+}
 #else
-#define PRINT(x)
+#define PRINT(...) ((void)0)
+#define printValue(label, value) ((void)0)
 #endif
 
 Servo servo;
 Ultrasonic sonar(TRIG_PIN, ECHO_PIN);
 MPU6050 mpu;
 
-uint32_t speedTimer = 0;
+// gyroscope state
 uint32_t angleTimer = 0;
-float angles[3], prevAngle = 0.0f;
-int8_t k = 0;
+float angles[3];
+int8_t turnCount = 0; // full turns made, to get a continuous angle
 uint8_t fifoBuffer[45];
-
-int leftSpeed = 0, rightSpeed = 0;
-
-int16_t lastDistance = 0;
-uint32_t sonarTimer = 0;
 float initAngle = 0.0f, currAngle = 0.0f;
 
-void setupServo();
-void setupGyroscope();
-void setupMotors();
-void stopMotors();
-void setMotorSpeeds(int left, int right);
-void setLeftMotor(int speed);
-void setRightMotor(int speed);
-void applyMotorSpeeds();
-void applyPeriodicSpeeds(uint16_t period);
-float getAngleZ();
-void adjustSpeedsToMoveForward(int base);
-void adjustSpeedsToMoveBackward(int base);
-uint16_t distanceOn(int angle);
-uint16_t preciseDistanceOn(int angle);
-
+// motor state
+uint32_t speedTimer = 0;
+int leftSpeed = 0, rightSpeed = 0;
 
 void setupServo() {
   servo.attach(SERVO_PIN);
-  servo.write(90); // стартовое положение
+  servo.write(FRONT);
 }
 
 void setupGyroscope() {
@@ -93,11 +78,27 @@ void setupGyroscope() {
   mpu.initialize();
   mpu.dmpInitialize();
   mpu.setDMPEnabled(true);
-  
+
   mpu.setZGyroOffset(Z_GYRO_OFFSET);
   Serial.println("Waiting for gyro's settling (5 seconds)");
   delay(5000);
   Serial.println("Setup is completed");
+}
+
+// ##### MOTORS #####
+
+// for negative speeds IN2 is HIGH, so the PWM on IN1 is inverted
+static void setMotor(uint8_t pwmPin, uint8_t dirPin, int speed) {
+  analogWrite(pwmPin, speed);
+  digitalWrite(dirPin, speed >= 0 ? LOW : HIGH);
+}
+
+void setLeftMotor(int speed) { setMotor(L_MOTOR_IN1, L_MOTOR_IN2, speed); }
+void setRightMotor(int speed) { setMotor(R_MOTOR_IN1, R_MOTOR_IN2, speed); }
+
+void stopMotors() {
+  setLeftMotor(0);
+  setRightMotor(0);
 }
 
 void setupMotors() {
@@ -105,13 +106,7 @@ void setupMotors() {
   pinMode(L_MOTOR_IN2, OUTPUT);
   pinMode(R_MOTOR_IN1, OUTPUT);
   pinMode(R_MOTOR_IN2, OUTPUT);
-  
   stopMotors();
-}
-
-void stopMotors() {
-  setLeftMotor(0);
-  setRightMotor(0);
 }
 
 void setMotorSpeeds(int left, int right) {
@@ -124,68 +119,49 @@ void applyMotorSpeeds() {
   setRightMotor(rightSpeed);
 }
 
-void setLeftMotor(int speed) {
-  if (speed >= 0) {
-    analogWrite(L_MOTOR_IN1, speed);
-    digitalWrite(L_MOTOR_IN2, LOW);
-  } else {
-    analogWrite(L_MOTOR_IN1, speed);
-    digitalWrite(L_MOTOR_IN2, HIGH);
+// alternates between applying the speeds and stopping every `period` ms
+void applyPeriodicSpeeds(uint16_t period) {
+  static bool stopped = false;
+  if (millis() - speedTimer >= period) {
+    if (stopped) {
+      stopMotors();
+    } else {
+      applyMotorSpeeds();
+    }
+    stopped = !stopped;
+    speedTimer = millis();
   }
 }
 
-void setRightMotor(int speed) {
-  if (speed >= 0) {
-    analogWrite(R_MOTOR_IN1, speed);
-    digitalWrite(R_MOTOR_IN2, LOW);
-  } else {
-    analogWrite(R_MOTOR_IN1, speed);
-    digitalWrite(R_MOTOR_IN2, HIGH);
-  }
-}
+// ##### GYROSCOPE #####
 
 float getAngleZ() {
-  prevAngle = angles[0];
+  float prevAngle = angles[0];
   // данные от датчика прилетает раз в 10 мс
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer) && millis() - angleTimer >= 11) {
     Quaternion q;
     VectorFloat gravity;
-    
+
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(angles, &q, &gravity);
 
     angleTimer = millis();
 
+    // yaw wraps around at +-PI, count the wraps
     float diff = angles[0] - prevAngle;
-    if (abs(diff) < PI) {
-      // it's okay
-    } else if(diff > 0.0f) {
-      k -= 1;
-    } else {
-      k += 1;
+    if (abs(diff) >= PI) {
+      turnCount += diff > 0.0f ? -1 : 1;
     }
   }
-  return angles[0] + (2.0f*PI)*k;
+  return angles[0] + (2.0f * PI) * turnCount;
 }
 
-void applyPeriodicSpeeds(uint16_t period) {
-  static bool flag = false;
-  if (millis() - speedTimer >= period) {
-    if (flag) {
-      stopMotors();
-    } else {
-      setLeftMotor(leftSpeed);
-      setRightMotor(rightSpeed);
-    }
-    flag = !flag;
-    speedTimer = millis();
-  }
-}
+// ##### STEERING #####
 
 void adjustSpeedsToMoveForward(int base) {
   float diffAngle = initAngle - currAngle;
-  int16_t diffTerm = (int16_t)(diffAngle/PI*TURN_STRENGTH);
+  int16_t diffTerm = (int16_t)(diffAngle / PI * TURN_STRENGTH);
   if (diffAngle < 0) {
     setMotorSpeeds(base + diffTerm, base);
   } else {
@@ -195,13 +171,15 @@ void adjustSpeedsToMoveForward(int base) {
 
 void adjustSpeedsToMoveBackward(int base) {
   float diffAngle = initAngle - currAngle;
-  int16_t diffTerm = (int16_t)(diffAngle/PI*TURN_STRENGTH);
+  int16_t diffTerm = (int16_t)(diffAngle / PI * TURN_STRENGTH);
   if (diffAngle < 0) {
-    setMotorSpeeds(-base, -base-diffTerm);
+    setMotorSpeeds(-base, -base - diffTerm);
   } else {
-    setMotorSpeeds(-base+diffTerm, -base);
+    setMotorSpeeds(-base + diffTerm, -base);
   }
 }
+
+// ##### SONAR #####
 
 /**
  * use only if the distance is closer than 60cm
@@ -215,18 +193,15 @@ uint16_t distanceOn(int angle) {
   return val;
 }
 
+// retries until the sonar returns a valid (non-zero) reading
 uint16_t preciseDistanceOn(int angle) {
   uint8_t initServoAngle = servo.read();
   servo.write(angle);
-  // uint32_t servoRotationTime = abs(initServoAngle - angle) * SERVO_DELAY_MS_PER_DEGREE;
-  // if (millis() - sonarTimer > SONAR_DELAY_MS) {
-  //   sonarTimer = millis();
-  // }
   uint16_t val;
   do {
     delay(max(abs(initServoAngle - angle) * SERVO_DELAY_MS_PER_DEGREE, SONAR_DELAY_MS));
     val = sonar.read();
-  } while(val < 1);
+  } while (val < 1);
   PRINT("Distance at angle %d: %d (%d)", angle, val, millis());
   return val;
 }
